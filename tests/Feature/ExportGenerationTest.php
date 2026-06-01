@@ -48,8 +48,73 @@ class ExportGenerationTest extends TestCase
         $this->assertSame('alice@example.test', $players[2][1]);
         $this->assertCount(3, $players);
 
-        // Events_Summary: summary non ancora implementato → tab vuoto.
-        $this->assertSame([], $sheetsData['Events_Summary']);
+        // Events_Summary senza eventi seedati: solo l'intestazione.
+        $this->assertSame([['type', 'count']], $sheetsData['Events_Summary']);
+    }
+
+    public function test_events_summary_aggregates_by_dimension_with_metrics()
+    {
+        Storage::fake('local');
+        $version = Version::factory()->create();
+        $a = Player::factory()->for($version)->create();
+        $b = Player::factory()->for($version)->create();
+
+        // type 'open': 3 eventi, 2 player distinti.
+        $this->insertEvent($version->id, $a->id, 'open', [], '2026-01-01 10:00:00');
+        $this->insertEvent($version->id, $a->id, 'open', [], '2026-01-02 10:00:00');
+        $this->insertEvent($version->id, $b->id, 'open', [], '2026-01-03 10:00:00');
+        // type 'share': 2 eventi, 1 player distinto.
+        $this->insertEvent($version->id, $a->id, 'share', [], '2026-01-04 10:00:00');
+        $this->insertEvent($version->id, $a->id, 'share', [], '2026-01-05 10:00:00');
+
+        $payload = [
+            'format' => 'xlsx',
+            'sheets' => [
+                ['name' => 'events_summary', 'group_by' => ['type'], 'metrics' => ['count', 'unique_players']],
+            ],
+        ];
+
+        $this->postJson("/api/v1/versions/{$version->id}/exports", $payload)->assertStatus(202);
+
+        [, $sheetsData] = $this->readWorkbook(Storage::disk('local')->path(Export::firstOrFail()->file_path));
+        $summary = $sheetsData['Events_Summary'];
+
+        $this->assertSame(['type', 'count', 'unique_players'], $summary[0]);
+        // Ordinato per dimensione (type asc): open poi share.
+        $this->assertSame(['open', '3', '2'], $summary[1]);
+        $this->assertSame(['share', '2', '1'], $summary[2]);
+        $this->assertCount(3, $summary); // header + 2 gruppi
+    }
+
+    public function test_events_summary_groups_by_payload_dimension()
+    {
+        Storage::fake('local');
+        $version = Version::factory()->create();
+        $player = Player::factory()->for($version)->create();
+
+        $this->insertEvent($version->id, $player->id, 'open', ['language' => 'it'], '2026-01-01 10:00:00');
+        $this->insertEvent($version->id, $player->id, 'open', ['language' => 'it'], '2026-01-02 10:00:00');
+        $this->insertEvent($version->id, $player->id, 'open', ['language' => 'en'], '2026-01-03 10:00:00');
+
+        $payload = [
+            'format' => 'xlsx',
+            'sheets' => [
+                ['name' => 'events_summary', 'group_by' => ['payload.language'], 'metrics' => ['count']],
+            ],
+        ];
+
+        $this->postJson("/api/v1/versions/{$version->id}/exports", $payload)->assertStatus(202);
+
+        $export = Export::firstOrFail();
+        $this->assertSame(Export::STATUS_COMPLETED, $export->status);
+
+        [, $sheetsData] = $this->readWorkbook(Storage::disk('local')->path($export->file_path));
+        $summary = $sheetsData['Events_Summary'];
+
+        $this->assertSame(['payload.language', 'count'], $summary[0]);
+        // Ordinato per lingua: en (1) poi it (2).
+        $this->assertSame(['en', '1'], $summary[1]);
+        $this->assertSame(['it', '2'], $summary[2]);
     }
 
     public function test_players_sheet_applies_filter_and_date_range()

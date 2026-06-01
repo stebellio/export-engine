@@ -7,20 +7,30 @@ use App\Exports\Sheets\AbstractSummarySheet;
 /**
  * Foglio "events_summary" (summary): aggregazione degli eventi per dimensioni
  * (`type` + `payload.*`) con metriche count / unique_players.
- *
- * NOTA: schema dichiarato; `rows()` eredita il default vuoto finché non si
- * implementa il rendering nello step dedicato ai summary sheets.
  */
 class EventsSummarySheet extends AbstractSummarySheet
 {
-    protected function allowedGroupBy(): array
+    protected function table(): string
     {
-        return ['type'];
+        return 'events';
     }
 
-    protected function allowedMetrics(): array
+    protected function timeColumn(): ?string
     {
-        return ['count', 'unique_players'];
+        return 'occurred_at';
+    }
+
+    protected function groupByColumnMap(): array
+    {
+        return ['type' => 'type'];
+    }
+
+    protected function metricMap(): array
+    {
+        return [
+            'count' => 'COUNT(*)',
+            'unique_players' => 'COUNT(DISTINCT player_id)',
+        ];
     }
 
     protected function supportsPayload(): bool
