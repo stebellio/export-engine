@@ -5,20 +5,18 @@ namespace App\Exports\Sheets;
 use App\Models\Version;
 
 /**
- * Base dei fogli dati (richiedibili dal client). Porta il contesto di rendering
- * — versione, config del foglio, range temporale globale — iniettato in
- * costruzione. I parametri sono opzionali così l'istanza resta costruibile "a
- * vuoto" per la sola validazione (`new XxxSheet()` → `validate($config)`).
+ * Base for requestable data sheets.
  *
- * `rows()` ha default vuoto: un foglio non ancora implementato produce un tab
- * presente ma senza righe. I fogli concreti lo sovrascrivono quando pronti.
+ * Constructor args are optional on purpose: a no-arg instance is used for
+ * validation (no data needed), a fully-built one for rendering. The default
+ * empty rows() yields a present-but-empty tab for sheets not yet implemented.
  */
 abstract class AbstractDataSheet extends AbstractSheet
 {
     /** @var Version|null */
     protected $version;
 
-    /** @var array config del singolo foglio (columns/filters/sort/group_by/metrics) */
+    /** @var array */
     protected $config;
 
     /** @var string|null */

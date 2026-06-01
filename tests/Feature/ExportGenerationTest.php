@@ -41,14 +41,12 @@ class ExportGenerationTest extends TestCase
 
         $this->assertSame(['README', 'Configurazione_Richiesta', 'Players', 'Events_Summary'], $sheetNames);
 
-        // Players: header + righe ordinate per registered_at desc (bob prima di alice).
         $players = $sheetsData['Players'];
         $this->assertSame(['player_id', 'email', 'registered_at'], $players[0]);
         $this->assertSame('bob@example.test', $players[1][1]);
         $this->assertSame('alice@example.test', $players[2][1]);
         $this->assertCount(3, $players);
 
-        // Events_Summary senza eventi seedati: solo l'intestazione.
         $this->assertSame([['type', 'count']], $sheetsData['Events_Summary']);
     }
 
@@ -59,11 +57,9 @@ class ExportGenerationTest extends TestCase
         $a = Player::factory()->for($version)->create();
         $b = Player::factory()->for($version)->create();
 
-        // type 'open': 3 eventi, 2 player distinti.
         $this->insertEvent($version->id, $a->id, 'open', [], '2026-01-01 10:00:00');
         $this->insertEvent($version->id, $a->id, 'open', [], '2026-01-02 10:00:00');
         $this->insertEvent($version->id, $b->id, 'open', [], '2026-01-03 10:00:00');
-        // type 'share': 2 eventi, 1 player distinto.
         $this->insertEvent($version->id, $a->id, 'share', [], '2026-01-04 10:00:00');
         $this->insertEvent($version->id, $a->id, 'share', [], '2026-01-05 10:00:00');
 
@@ -80,10 +76,9 @@ class ExportGenerationTest extends TestCase
         $summary = $sheetsData['Events_Summary'];
 
         $this->assertSame(['type', 'count', 'unique_players'], $summary[0]);
-        // Ordinato per dimensione (type asc): open poi share.
         $this->assertSame(['open', '3', '2'], $summary[1]);
         $this->assertSame(['share', '2', '1'], $summary[2]);
-        $this->assertCount(3, $summary); // header + 2 gruppi
+        $this->assertCount(3, $summary);
     }
 
     public function test_events_summary_groups_by_payload_dimension()
@@ -112,7 +107,6 @@ class ExportGenerationTest extends TestCase
         $summary = $sheetsData['Events_Summary'];
 
         $this->assertSame(['payload.language', 'count'], $summary[0]);
-        // Ordinato per lingua: en (1) poi it (2).
         $this->assertSame(['en', '1'], $summary[1]);
         $this->assertSame(['it', '2'], $summary[2]);
     }
@@ -161,7 +155,7 @@ class ExportGenerationTest extends TestCase
 
         $players = $sheetsData['Players'];
         $this->assertSame(['email'], $players[0]);
-        $this->assertCount(2, $players); // header + solo keep@
+        $this->assertCount(2, $players);
         $this->assertSame('keep@example.test', $players[1][0]);
     }
 
@@ -193,8 +187,7 @@ class ExportGenerationTest extends TestCase
         $events = $sheetsData['Events'];
 
         $this->assertSame(['type', 'payload.language', 'payload.score'], $events[0]);
-        $this->assertCount(3, $events); // header + 2 eventi 'it'
-        // Ordinati per payload.score desc: complete(30) poi open(10).
+        $this->assertCount(3, $events);
         $this->assertSame(['complete', 'it', '30'], $events[1]);
         $this->assertSame(['open', 'it', '10'], $events[2]);
     }

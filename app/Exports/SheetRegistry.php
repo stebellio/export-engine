@@ -12,8 +12,8 @@ use App\Exports\Sheets\SheetInterface;
 use App\Models\Version;
 
 /**
- * Anagrafica di tutti i fogli richiedibili dal client: mappa `name` → classe-foglio.
- * Sorgente unica per validazione e (dai prossimi step) rendering.
+ * Maps a requestable sheet name to its class. Single source for both validation
+ * (no context) and rendering (with version/config/date range).
  */
 class SheetRegistry
 {
@@ -39,12 +39,6 @@ class SheetRegistry
         return isset(self::MAP[$name]);
     }
 
-    /**
-     * Istanza del foglio per il nome dato, o null se sconosciuto.
-     *
-     * Il contesto è opzionale: senza, l'istanza serve alla sola validazione;
-     * con versione/config/range serve al rendering.
-     */
     public function get(
         string $name,
         ?Version $version = null,

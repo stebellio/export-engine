@@ -23,10 +23,6 @@ class StoreExportRequest extends FormRequest
         ];
     }
 
-    /**
-     * Validazione semantica dei fogli: per ogni foglio richiesto si recupera la
-     * relativa classe dal registry e le si delega la validazione della config.
-     */
     public function withValidator($validator)
     {
         $validator->after(function ($validator) {
@@ -47,7 +43,6 @@ class StoreExportRequest extends FormRequest
 
                 $name = $sheet['name'] ?? null;
                 if (! is_string($name) || $name === '') {
-                    // Già coperto dalla regola strutturale sheets.*.name.
                     continue;
                 }
 

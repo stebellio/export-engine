@@ -4,10 +4,6 @@ namespace App\Exports\Sheets\Metadata;
 
 use App\Exports\Sheets\AbstractSheet;
 
-/**
- * Foglio metadata "Configurazione_Richiesta": echo appiattito della config
- * inviata dal client (utile per riprodurre/auditare l'export).
- */
 class RequestConfigSheet extends AbstractSheet
 {
     /** @var array */
@@ -34,8 +30,6 @@ class RequestConfigSheet extends AbstractSheet
     }
 
     /**
-     * Appiattisce la config in coppie parametro/valore leggibili.
-     *
      * @return array<string,string>
      */
     public function flatten(array $config): array

@@ -11,10 +11,8 @@ use OpenSpout\Writer\Common\Creator\WriterEntityFactory;
 use OpenSpout\Writer\WriterMultiSheetsAbstract;
 
 /**
- * Orchestratore della generazione del file: assembla i fogli (prima i metadata,
- * poi quelli richiesti dalla config) e li scrive su disco in streaming.
- *
- * È l'unico punto che conosce la libreria di scrittura; i fogli restano puri.
+ * Builds the XLSX file: metadata sheets first, then the requested ones, streamed
+ * to disk. The only piece that knows OpenSpout; sheets stay pure.
  */
 class ExportWorkbookWriter
 {
@@ -26,9 +24,6 @@ class ExportWorkbookWriter
         $this->registry = $registry;
     }
 
-    /**
-     * Genera il file dell'export e ritorna il path relativo al disco configurato.
-     */
     public function write(Export $export): string
     {
         $directory = config('export.directory');
@@ -56,8 +51,6 @@ class ExportWorkbookWriter
     }
 
     /**
-     * Ordine dei fogli: metadata di testa, poi i fogli richiesti (ordine config).
-     *
      * @return SheetInterface[]
      */
     private function sheets(Export $export): array
@@ -77,9 +70,6 @@ class ExportWorkbookWriter
     }
 
     /**
-     * Fogli dati richiesti dal client, costruiti con il loro contesto
-     * (versione + config del foglio + range temporale globale).
-     *
      * @return SheetInterface[]
      */
     private function requestedSheets(Export $export): array
@@ -116,8 +106,7 @@ class ExportWorkbookWriter
     }
 
     /**
-     * Nome foglio valido e univoco nel workbook: caratteri ammessi, ≤31 char,
-     * con suffisso incrementale in caso di collisione.
+     * Excel-safe, unique sheet name (allowed chars, max 31, suffixed on clash).
      *
      * @param array<string,bool> $usedNames
      */
@@ -136,9 +125,6 @@ class ExportWorkbookWriter
         return $name;
     }
 
-    /**
-     * Nome foglio valido per Excel: niente caratteri proibiti, max 31 caratteri.
-     */
     private function sanitizeTitle(string $title): string
     {
         $clean = trim(str_replace(['\\', '/', '?', '*', ':', '[', ']'], ' ', $title));

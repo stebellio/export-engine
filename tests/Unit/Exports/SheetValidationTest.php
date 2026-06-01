@@ -38,12 +38,10 @@ class SheetValidationTest extends TestCase
 
     public function test_payload_path_allowed_only_when_supported()
     {
-        // TransactionsSheet supporta payload.*
         $this->assertSame([], (new TransactionsSheet())->validate([
             'columns' => ['amount', 'payload.gateway'],
         ]));
 
-        // PlayersSheet non supporta payload.*
         $this->assertNotEmpty((new PlayersSheet())->validate([
             'columns' => ['payload.language'],
         ]));

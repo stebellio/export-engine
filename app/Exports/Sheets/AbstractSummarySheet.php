@@ -5,36 +5,24 @@ namespace App\Exports\Sheets;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Foglio "summary": aggregazione. Config ammessa: `group_by`, `metrics`.
- *
- * Le sottoclassi concrete dichiarano tabella, mappa dimensione→colonna DB e
- * mappa metrica→espressione SQL; validazione e rendering (GROUP BY in streaming,
- * con supporto alle dimensioni `payload.*`) sono qui, condivisi.
+ * Summary sheet: one row per group. Concrete sheets declare table(),
+ * groupByColumnMap() and metricMap() (metric => SQL aggregate); validation and
+ * the streamed GROUP BY rendering live here.
  */
 abstract class AbstractSummarySheet extends AbstractDataSheet
 {
-    /**
-     * Tabella di base dell'entità da aggregare.
-     */
     abstract protected function table(): string;
 
     /**
-     * Mappa dimensione logica di group_by → colonna reale sul DB.
-     *
-     * @return array<string,string>
+     * @return array<string,string> group_by dimension => DB column
      */
     abstract protected function groupByColumnMap(): array;
 
     /**
-     * Mappa metrica → espressione SQL aggregata (es. 'count' => 'COUNT(*)').
-     *
-     * @return array<string,string>
+     * @return array<string,string> metric name => SQL aggregate
      */
     abstract protected function metricMap(): array;
 
-    /**
-     * Colonna per il filtro temporale `date_from`/`date_to` (o null).
-     */
     protected function timeColumn(): ?string
     {
         return null;
@@ -46,7 +34,6 @@ abstract class AbstractSummarySheet extends AbstractDataSheet
         $metrics = $this->config['metrics'] ?? [];
         $metricMap = $this->metricMap();
 
-        // Intestazione: dimensioni + metriche (nomi logici richiesti).
         yield array_merge($groupBy, $metrics);
 
         $selectParts = [];
@@ -85,10 +72,10 @@ abstract class AbstractSummarySheet extends AbstractDataSheet
         }
 
         if ($dimAliases !== []) {
-            // Raggruppo per alias delle dimensioni: evita placeholder duplicati e
-            // soddisfa only_full_group_by (l'alias riferisce l'espressione del SELECT).
+            // Group by the select aliases: avoids duplicated placeholders and
+            // satisfies MySQL only_full_group_by.
             $query->groupByRaw(implode(', ', $dimAliases));
-            $query->orderByRaw(implode(', ', $dimAliases)); // ordine stabile per dimensione
+            $query->orderByRaw(implode(', ', $dimAliases));
         }
 
         foreach ($query->cursor() as $record) {
@@ -101,10 +88,7 @@ abstract class AbstractSummarySheet extends AbstractDataSheet
     }
 
     /**
-     * Espressione SQL (e bindings) per una dimensione di group_by:
-     * colonna diretta oppure estrazione da payload.
-     *
-     * @return array{0:string,1:array<int,string>}
+     * @return array{0:string,1:array<int,string>} [SQL expression, bindings]
      */
     private function dimensionExpression(string $dim): array
     {
@@ -114,7 +98,6 @@ abstract class AbstractSummarySheet extends AbstractDataSheet
             return [$map[$dim], []];
         }
 
-        // payload.* → estrazione JSON con path bound.
         return ['JSON_UNQUOTE(JSON_EXTRACT(payload, ?))', ['$.'.substr($dim, strlen('payload.'))]];
     }
 

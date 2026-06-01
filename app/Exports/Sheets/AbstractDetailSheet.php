@@ -6,37 +6,24 @@ use Illuminate\Database\Query\Builder;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Foglio "detail": righe da una entità. Config ammessa: `columns`, `filters`, `sort`.
- *
- * Le sottoclassi concrete dichiarano solo la tabella, la mappa colonna→DB e la
- * colonna temporale; la validazione e il rendering (query in streaming, con
- * supporto opzionale ai campi `payload.*`) sono qui, condivisi.
+ * Detail sheet: one row per record. Concrete sheets only declare table(),
+ * columnMap() and timeColumn(); validation and streamed rendering live here.
  */
 abstract class AbstractDetailSheet extends AbstractDataSheet
 {
-    /**
-     * Tabella di base dell'entità.
-     */
     abstract protected function table(): string;
 
     /**
-     * Mappa colonna logica (lato client) → colonna reale sul DB.
-     *
-     * @return array<string,string>
+     * @return array<string,string> logical column => DB column
      */
     abstract protected function columnMap(): array;
 
-    /**
-     * Colonna usata per il filtro temporale `date_from`/`date_to` (o null).
-     */
     protected function timeColumn(): ?string
     {
         return null;
     }
 
     /**
-     * Colonne logiche ammesse = chiavi della mappa (oltre agli eventuali payload.*).
-     *
      * @return string[]
      */
     protected function allowedColumns(): array
@@ -49,7 +36,6 @@ abstract class AbstractDetailSheet extends AbstractDataSheet
         $map = $this->columnMap();
         $columns = $this->config['columns'] ?? array_keys($map);
 
-        // Intestazione.
         yield $columns;
 
         $query = DB::table($this->table())->where('version_id', $this->version->id);
@@ -96,15 +82,12 @@ abstract class AbstractDetailSheet extends AbstractDataSheet
         if (isset($map[$col])) {
             $query->orderBy($map[$col], $dir);
         } elseif ($this->isPayloadField($col)) {
-            // $dir è già normalizzato ad asc|desc, quindi sicuro da concatenare.
+            // $dir is already normalised to asc|desc, so safe to inline.
             $query->orderByRaw('JSON_UNQUOTE(JSON_EXTRACT(payload, ?)) '.$dir, [$this->jsonPath($col)]);
         }
     }
 
     /**
-     * Costruisce la riga di output nell'ordine delle colonne richieste,
-     * risolvendo colonne dirette e campi payload.*.
-     *
      * @param array<int,string> $columns
      * @param array<string,string> $map
      * @return array<int,mixed>
@@ -141,8 +124,6 @@ abstract class AbstractDetailSheet extends AbstractDataSheet
     }
 
     /**
-     * Estrae un valore annidato dal payload seguendo il path puntato.
-     *
      * @param array<string,mixed> $payload
      * @return mixed
      */
@@ -160,7 +141,7 @@ abstract class AbstractDetailSheet extends AbstractDataSheet
     }
 
     /**
-     * @return array{0:string,1:string} [colonna, direzione]
+     * @return array{0:string,1:string} [column, direction]
      */
     private function parseSort(string $entry): array
     {

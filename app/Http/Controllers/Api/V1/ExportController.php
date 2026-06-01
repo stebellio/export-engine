@@ -21,8 +21,6 @@ class ExportController extends Controller
         $export = $version->exports()->create([
             'status' => Export::STATUS_PENDING,
             'format' => $data['format'] ?? 'xlsx',
-            // La config validata completa viene conservata: guida la generazione
-            // e viene riecheggiata nel foglio Configurazione_Richiesta.
             'config' => $data,
         ]);
 

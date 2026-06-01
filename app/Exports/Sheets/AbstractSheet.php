@@ -2,16 +2,6 @@
 
 namespace App\Exports\Sheets;
 
-/**
- * Base comune a tutti i fogli: default e helper condivisi.
- *
- * I fogli restano "puri": espongono identità (`title`), contenuto (`rows`) e
- * validazione (`validate`), senza conoscere la libreria di scrittura — di quella
- * si occupa l'orchestratore.
- *
- * `validate()` ha default no-op (i metadata non validano nulla); i fogli dati
- * lo sovrascrivono nelle basi detail/summary.
- */
 abstract class AbstractSheet implements SheetInterface
 {
     public function validate(array $config): array
@@ -23,9 +13,6 @@ abstract class AbstractSheet implements SheetInterface
 
     abstract public function rows(): iterable;
 
-    /**
-     * Se il foglio ammette colonne/dimensioni dentro il payload JSON (`payload.*`).
-     */
     protected function supportsPayload(): bool
     {
         return false;

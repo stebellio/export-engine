@@ -4,9 +4,6 @@ namespace App\Exports\Sheets\Data;
 
 use App\Exports\Sheets\AbstractDetailSheet;
 
-/**
- * Foglio dati "rewards" (detail).
- */
 class RewardsSheet extends AbstractDetailSheet
 {
     protected function table(): string

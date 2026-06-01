@@ -4,10 +4,6 @@ namespace App\Exports\Sheets\Data;
 
 use App\Exports\Sheets\AbstractSummarySheet;
 
-/**
- * Foglio "events_summary" (summary): aggregazione degli eventi per dimensioni
- * (`type` + `payload.*`) con metriche count / unique_players.
- */
 class EventsSummarySheet extends AbstractSummarySheet
 {
     protected function table(): string

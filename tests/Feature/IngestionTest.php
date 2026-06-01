@@ -91,7 +91,6 @@ class IngestionTest extends TestCase
         $versionB = Version::factory()->create();
         $playerB = Player::factory()->for($versionB)->create();
 
-        // Evento sotto la versione A che referenzia un player della versione B.
         $this->postJson("/api/v1/versions/{$versionA->id}/events", [
             'items' => [[
                 'player_id' => $playerB->id,

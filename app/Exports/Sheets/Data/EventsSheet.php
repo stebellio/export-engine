@@ -4,9 +4,6 @@ namespace App\Exports\Sheets\Data;
 
 use App\Exports\Sheets\AbstractDetailSheet;
 
-/**
- * Foglio dati "events" (detail). Ammette colonne/filtri/sort su `payload.*`.
- */
 class EventsSheet extends AbstractDetailSheet
 {
     protected function table(): string

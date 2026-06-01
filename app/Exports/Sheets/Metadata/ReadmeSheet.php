@@ -6,10 +6,6 @@ use App\Exports\Sheets\AbstractSheet;
 use App\Models\Export;
 use Illuminate\Support\Carbon;
 
-/**
- * Foglio metadata "README": riepilogo a coppie chiave/valore dell'export.
- * Popolato solo con dati realmente disponibili (versione, richiesta, timestamp).
- */
 class ReadmeSheet extends AbstractSheet
 {
     /** @var Export */
