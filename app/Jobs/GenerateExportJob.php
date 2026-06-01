@@ -2,14 +2,13 @@
 
 namespace App\Jobs;
 
+use App\Exports\ExportWorkbookWriter;
 use App\Models\Export;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Storage;
-use OpenSpout\Writer\Common\Creator\WriterEntityFactory;
 use Throwable;
 
 class GenerateExportJob implements ShouldQueue
@@ -31,7 +30,10 @@ class GenerateExportJob implements ShouldQueue
         $this->exportId = $exportId;
     }
 
-    public function handle(): void
+    /**
+     * @throws Throwable
+     */
+    public function handle(ExportWorkbookWriter $writer): void
     {
         $export = Export::find($this->exportId);
 
@@ -42,13 +44,7 @@ class GenerateExportJob implements ShouldQueue
         $export->markProcessing();
 
         try {
-            // Skeleton: simulate heavy work so "processing" is observable.
-            $processingSeconds = (int) config('export.mock_processing_seconds');
-            if ($processingSeconds > 0) {
-                sleep($processingSeconds);
-            }
-
-            $path = $this->writeMockFile($export);
+            $path = $writer->write($export);
 
             $export->markCompleted($path);
         } catch (Throwable $e) {
@@ -65,31 +61,5 @@ class GenerateExportJob implements ShouldQueue
         if ($export !== null && $export->status !== Export::STATUS_FAILED) {
             $export->markFailed($e->getMessage());
         }
-    }
-
-    /**
-     * Write a placeholder XLSX file. Real columns/data come later — for now it
-     * only proves the async write-to-disk pipeline works end to end.
-     *
-     * @return string Path relative to the configured disk.
-     */
-    private function writeMockFile(Export $export): string
-    {
-        $directory = config('export.directory');
-        $relativePath = $directory . '/export-' . $export->id . '.xlsx';
-
-        $disk = Storage::disk(config('export.disk'));
-        $disk->makeDirectory($directory);
-
-        $writer = WriterEntityFactory::createXLSXWriter();
-        $writer->openToFile($disk->path($relativePath));
-        $writer->addRow(WriterEntityFactory::createRowFromArray([
-            'mock export',
-            'export_id',
-            (string) $export->id,
-        ]));
-        $writer->close();
-
-        return $relativePath;
     }
 }

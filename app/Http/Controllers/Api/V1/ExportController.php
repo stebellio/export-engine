@@ -9,7 +9,6 @@ use App\Models\Export;
 use App\Models\Version;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
@@ -22,15 +21,12 @@ class ExportController extends Controller
         $export = $version->exports()->create([
             'status' => Export::STATUS_PENDING,
             'format' => $data['format'] ?? 'xlsx',
-            // Skeleton: the whole request (minus format) is kept as config and
-            // is not yet interpreted by the job.
-            'config' => $request->except('format'),
+            // La config validata completa viene conservata: guida la generazione
+            // e viene riecheggiata nel foglio Configurazione_Richiesta.
+            'config' => $data,
         ]);
 
-        // Dispatch with a delay so the export stays "pending" long enough to be
-        // observable while the generation logic is still mocked.
-        GenerateExportJob::dispatch($export->id)
-            ->delay(Carbon::now()->addSeconds((int) config('export.mock_delay_seconds')));
+        GenerateExportJob::dispatch($export->id);
 
         return response()->json($this->present($export), Response::HTTP_ACCEPTED);
     }
