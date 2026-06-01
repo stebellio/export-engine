@@ -9,6 +9,7 @@ use App\Exports\Sheets\Data\PlayersSheet;
 use App\Exports\Sheets\Data\RewardsSheet;
 use App\Exports\Sheets\Data\TransactionsSheet;
 use App\Exports\Sheets\SheetInterface;
+use App\Models\Version;
 
 /**
  * Anagrafica di tutti i fogli richiedibili dal client: mappa `name` → classe-foglio.
@@ -40,11 +41,19 @@ class SheetRegistry
 
     /**
      * Istanza del foglio per il nome dato, o null se sconosciuto.
+     *
+     * Il contesto è opzionale: senza, l'istanza serve alla sola validazione;
+     * con versione/config/range serve al rendering.
      */
-    public function get(string $name): ?SheetInterface
-    {
+    public function get(
+        string $name,
+        ?Version $version = null,
+        array $config = [],
+        ?string $dateFrom = null,
+        ?string $dateTo = null
+    ): ?SheetInterface {
         $class = self::MAP[$name] ?? null;
 
-        return $class ? new $class() : null;
+        return $class ? new $class($version, $config, $dateFrom, $dateTo) : null;
     }
 }

@@ -3,19 +3,30 @@
 namespace App\Exports\Sheets\Data;
 
 use App\Exports\Sheets\AbstractDetailSheet;
-use LogicException;
 
 /**
  * Foglio dati "events" (detail). Ammette colonne/filtri/sort su `payload.*`.
- *
- * NOTA: per ora la classe dichiara solo lo schema (validazione).
- * Il rendering (`rows()`) viene aggiunto nello step dedicato ai detail sheets.
  */
 class EventsSheet extends AbstractDetailSheet
 {
-    protected function allowedColumns(): array
+    protected function table(): string
     {
-        return ['event_id', 'player_id', 'type', 'occurred_at'];
+        return 'events';
+    }
+
+    protected function columnMap(): array
+    {
+        return [
+            'event_id' => 'id',
+            'player_id' => 'player_id',
+            'type' => 'type',
+            'occurred_at' => 'occurred_at',
+        ];
+    }
+
+    protected function timeColumn(): ?string
+    {
+        return 'occurred_at';
     }
 
     protected function supportsPayload(): bool
@@ -26,10 +37,5 @@ class EventsSheet extends AbstractDetailSheet
     public function title(): string
     {
         return 'Events';
-    }
-
-    public function rows(): iterable
-    {
-        throw new LogicException('Rendering del foglio "events" non ancora implementato.');
     }
 }

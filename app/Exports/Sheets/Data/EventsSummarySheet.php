@@ -3,14 +3,13 @@
 namespace App\Exports\Sheets\Data;
 
 use App\Exports\Sheets\AbstractSummarySheet;
-use LogicException;
 
 /**
  * Foglio "events_summary" (summary): aggregazione degli eventi per dimensioni
  * (`type` + `payload.*`) con metriche count / unique_players.
  *
- * NOTA: per ora la classe dichiara solo lo schema (validazione).
- * Il rendering (`rows()`) viene aggiunto nello step dedicato ai summary sheets.
+ * NOTA: schema dichiarato; `rows()` eredita il default vuoto finché non si
+ * implementa il rendering nello step dedicato ai summary sheets.
  */
 class EventsSummarySheet extends AbstractSummarySheet
 {
@@ -32,10 +31,5 @@ class EventsSummarySheet extends AbstractSummarySheet
     public function title(): string
     {
         return 'Events_Summary';
-    }
-
-    public function rows(): iterable
-    {
-        throw new LogicException('Rendering del foglio "events_summary" non ancora implementato.');
     }
 }

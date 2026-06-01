@@ -6,7 +6,7 @@ namespace App\Exports\Sheets;
  * Foglio "summary": aggregazione. Config ammessa: `group_by`, `metrics`.
  * Le sottoclassi concrete dichiarano dimensioni e metriche ammesse.
  */
-abstract class AbstractSummarySheet extends AbstractSheet
+abstract class AbstractSummarySheet extends AbstractDataSheet
 {
     /**
      * Dimensioni di group_by ammesse (oltre agli eventuali `payload.*`).

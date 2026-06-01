@@ -3,19 +3,31 @@
 namespace App\Exports\Sheets\Data;
 
 use App\Exports\Sheets\AbstractDetailSheet;
-use LogicException;
 
 /**
  * Foglio dati "transactions" (detail). Ammette colonne/filtri/sort su `payload.*`.
- *
- * NOTA: per ora la classe dichiara solo lo schema (validazione).
- * Il rendering (`rows()`) viene aggiunto nello step dedicato ai detail sheets.
  */
 class TransactionsSheet extends AbstractDetailSheet
 {
-    protected function allowedColumns(): array
+    protected function table(): string
     {
-        return ['transaction_id', 'player_id', 'amount', 'currency', 'occurred_at'];
+        return 'transactions';
+    }
+
+    protected function columnMap(): array
+    {
+        return [
+            'transaction_id' => 'id',
+            'player_id' => 'player_id',
+            'amount' => 'amount',
+            'currency' => 'currency',
+            'occurred_at' => 'occurred_at',
+        ];
+    }
+
+    protected function timeColumn(): ?string
+    {
+        return 'occurred_at';
     }
 
     protected function supportsPayload(): bool
@@ -26,10 +38,5 @@ class TransactionsSheet extends AbstractDetailSheet
     public function title(): string
     {
         return 'Transactions';
-    }
-
-    public function rows(): iterable
-    {
-        throw new LogicException('Rendering del foglio "transactions" non ancora implementato.');
     }
 }

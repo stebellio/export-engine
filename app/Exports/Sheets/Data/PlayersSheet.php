@@ -3,28 +3,33 @@
 namespace App\Exports\Sheets\Data;
 
 use App\Exports\Sheets\AbstractDetailSheet;
-use LogicException;
 
 /**
- * Foglio dati "players" (detail).
- *
- * NOTA: per ora la classe dichiara solo le colonne ammesse (validazione).
- * Il rendering (`rows()`) viene aggiunto nello step dedicato ai detail sheets.
+ * Foglio dati "players" (detail). Colonne dirette; range temporale su registered_at.
  */
 class PlayersSheet extends AbstractDetailSheet
 {
-    protected function allowedColumns(): array
+    protected function table(): string
     {
-        return ['player_id', 'email', 'registered_at'];
+        return 'players';
+    }
+
+    protected function columnMap(): array
+    {
+        return [
+            'player_id' => 'id',
+            'email' => 'email',
+            'registered_at' => 'registered_at',
+        ];
+    }
+
+    protected function timeColumn(): ?string
+    {
+        return 'registered_at';
     }
 
     public function title(): string
     {
         return 'Players';
-    }
-
-    public function rows(): iterable
-    {
-        throw new LogicException('Rendering del foglio "players" non ancora implementato.');
     }
 }
