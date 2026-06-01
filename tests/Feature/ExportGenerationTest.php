@@ -117,6 +117,26 @@ class ExportGenerationTest extends TestCase
         $this->assertSame(['it', '2'], $summary[2]);
     }
 
+    public function test_duplicate_sheet_titles_are_deduplicated()
+    {
+        Storage::fake('local');
+        $version = Version::factory()->create();
+
+        $payload = [
+            'format' => 'xlsx',
+            'sheets' => [
+                ['name' => 'players', 'columns' => ['email']],
+                ['name' => 'players', 'columns' => ['player_id']],
+            ],
+        ];
+
+        $this->postJson("/api/v1/versions/{$version->id}/exports", $payload)->assertStatus(202);
+
+        [$sheetNames] = $this->readWorkbook(Storage::disk('local')->path(Export::firstOrFail()->file_path));
+
+        $this->assertSame(['README', 'Configurazione_Richiesta', 'Players', 'Players_2'], $sheetNames);
+    }
+
     public function test_players_sheet_applies_filter_and_date_range()
     {
         Storage::fake('local');
