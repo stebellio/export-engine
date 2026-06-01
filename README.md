@@ -1,64 +1,279 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400"></a></p>
+# Export Engine
 
-<p align="center">
-<a href="https://travis-ci.org/laravel/framework"><img src="https://travis-ci.org/laravel/framework.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+A Laravel 8 (PHP 8) JSON API that ingests game/campaign telemetry — players,
+events, transactions, answers, rewards — scoped under a **Version**, and produces
+**asynchronous, configurable XLSX exports** of that data.
 
-## About Laravel
+The client decides what each export contains: which sheets, which columns (including
+fields inside the JSON `payload`), filters, sorting, aggregations and a time range.
+Heavy exports run on a queue; the client polls for status and downloads the file when ready.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## Stack
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+- PHP 8 / Laravel 8
+- MySQL 8 (data) + Redis (queue/cache)
+- Queue worker for async export generation
+- [openspout/openspout](https://github.com/openspout/openspout) for streamed XLSX writing
+- PHPUnit
+- Docker / Docker Compose
 
-## Learning Laravel
+---
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## Architecture at a glance
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 1500 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+```
+POST /versions/{v}/exports ──► ExportController ──► GenerateExportJob (queue)
+                                                          │
+                                                          ▼
+                                              ExportWorkbookWriter (orchestrator)
+                                                          │
+                          ┌───────────────────────────────┼───────────────────────────┐
+                          ▼                                ▼                            ▼
+                  Metadata sheets                  Detail sheets                Summary sheets
+              (README, Configurazione_         (players, events, …             (events_summary:
+               Richiesta — auto-injected)       columns/filters/sort)           group_by/metrics)
+```
 
-## Laravel Sponsors
+- **Ingestion** is synchronous and bulk-inserted via the query builder for throughput.
+- **Export generation** is asynchronous (Redis queue). Status lifecycle:
+  `pending → processing → completed | failed`.
+- Every export file always starts with the **metadata sheets** (`README`,
+  `Configurazione_Richiesta`), followed by the **requested sheets**.
+- Rows are streamed (`cursor()` + OpenSpout) to keep memory constant on large exports.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+---
 
-### Premium Partners
+## Setup
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+```bash
+# 1. Environment
+cp .env.example .env
 
-## Contributing
+# 2. Build & start the stack (app, worker, mysql, redis)
+docker compose up -d --build
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+# 3. App key
+docker compose exec app php artisan key:generate
 
-## Code of Conduct
+# 4. Migrate and seed demo data (one version with players/events/…)
+docker compose exec app php artisan migrate --seed
+```
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+The API is now available at **http://localhost:8000** (`APP_PORT`, default `8000`).
 
-## Security Vulnerabilities
+> **Note on the worker:** the `worker` container is a long-running queue worker that
+> holds the code in memory. After changing any job/export code, restart it so queued
+> jobs pick up the new code:
+> ```bash
+> docker compose restart worker      # or: docker compose exec app php artisan queue:restart
+> ```
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### Demo dataset
 
-## License
+`migrate --seed` runs `DemoSeeder`, tunable via env vars (defaults shown):
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+| Var | Default | Meaning |
+|-----|---------|---------|
+| `DEMO_PLAYERS` | 200 | players created |
+| `DEMO_EVENTS_PER_PLAYER` | 50 | events per player |
+| `DEMO_TRANSACTIONS_PER_PLAYER` | 3 | transactions per player |
+| `DEMO_ANSWERS_PER_PLAYER` | 2 | answers per player |
+| `DEMO_REWARDS_PER_PLAYER` | 1 | rewards per player |
+
+Re-seed from scratch:
+
+```bash
+docker compose exec app php artisan migrate:fresh --seed
+```
+
+---
+
+## Running the tests
+
+Tests use a **dedicated database** so they never touch your dev data (they run
+`migrate:fresh`). Create it once:
+
+```bash
+docker compose exec mysql mysql -uroot -proot \
+  -e "CREATE DATABASE IF NOT EXISTS export_engine_testing CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+      GRANT ALL ON export_engine_testing.* TO 'laravel'@'%'; FLUSH PRIVILEGES;"
+```
+
+Then run the suite inside the container (where `DB_HOST=mysql` resolves):
+
+```bash
+docker compose exec app php artisan test
+# single test class / filter:
+docker compose exec app php artisan test --filter=ExportGenerationTest
+```
+
+`phpunit.xml` forces `QUEUE_CONNECTION=sync`, so dispatched jobs run inline during tests.
+
+---
+
+## API reference
+
+All routes are under the `/api/v1` prefix. Ingestion is nested under a version;
+export status/download are global by export id.
+
+### Ingestion
+
+| Method & path | Body | Notes |
+|---|---|---|
+| `POST /versions` | `{ "name": "..." }` | creates a version → `201 {id,name,...}` |
+| `POST /versions/{v}/players` | `{ "items": [ {email?, registered_at?} ] }` | bulk insert → `201 {count, items}` |
+| `POST /versions/{v}/events` | `{ "items": [ {player_id, type, occurred_at, payload?} ] }` | `201 {count}` |
+| `POST /versions/{v}/events/stream` | NDJSON body, one event per line | streaming ingest → `201 {count, batches}` |
+| `POST /versions/{v}/transactions` | `{ "items": [ {player_id, amount, currency, occurred_at, payload?} ] }` | `currency` = 3 letters |
+| `POST /versions/{v}/answers` | `{ "items": [ {player_id, question, answer, occurred_at} ] }` | `201 {count}` |
+| `POST /versions/{v}/rewards` | `{ "items": [ {player_id, name, value?, occurred_at} ] }` | `201 {count}` |
+
+Child records (events/transactions/answers/rewards) must reference players that belong
+to the **same version**, otherwise the request fails with `422`. Batch size is capped by
+`INGESTION_MAX_ITEMS_PER_BATCH` (default `1000`).
+
+### Export
+
+| Method & path | Purpose |
+|---|---|
+| `POST /versions/{v}/exports` | request an export → `202 {id, status:"pending", ...}` |
+| `GET /exports/{id}` | status + `download_url` (null until completed) |
+| `GET /exports/{id}/download` | stream the file (`409` if not completed, `404` if missing) |
+
+---
+
+## Export request format
+
+```jsonc
+{
+  "format": "xlsx",                 // optional, default "xlsx"
+  "date_from": "2026-01-01",        // optional time range, applied to each sheet's time column
+  "date_to": "2026-01-31",
+  "sheets": [                        // required, one or more sheets
+    {
+      "name": "players",            // detail sheet
+      "columns": ["player_id", "email", "registered_at"],
+      "filters": { "email": "alice@example.test" },
+      "sort": ["registered_at:desc"]
+    },
+    {
+      "name": "events_summary",     // summary sheet
+      "group_by": ["type", "payload.language"],
+      "metrics": ["count", "unique_players"]
+    }
+  ]
+}
+```
+
+The request is **fully validated up front** (`422` on any unknown sheet/column/metric, etc.).
+
+### Available sheets
+
+**Detail sheets** (one row per record) accept `columns`, `filters`, `sort`. Sheets with a
+JSON `payload` also accept `payload.<path>` fields in any of those.
+
+| Sheet | Columns | Time column | `payload.*` |
+|---|---|---|---|
+| `players` | `player_id, email, registered_at` | `registered_at` | – |
+| `events` | `event_id, player_id, type, occurred_at` | `occurred_at` | ✅ |
+| `transactions` | `transaction_id, player_id, amount, currency, occurred_at` | `occurred_at` | ✅ |
+| `answers` | `answer_id, player_id, question, answer, occurred_at` | `occurred_at` | – |
+| `rewards` | `reward_id, player_id, name, value, occurred_at` | `occurred_at` | – |
+
+**Summary sheets** (one row per group) accept `group_by` + `metrics`.
+
+| Sheet | `group_by` | `metrics` | Time column |
+|---|---|---|---|
+| `events_summary` | `type`, `payload.*` | `count`, `unique_players` | `occurred_at` |
+
+- `filters` are equality matches (`{ "field": "value" }`).
+- `sort` entries are `"column:asc"` or `"column:desc"` (default `asc`).
+- The metadata sheets (`README`, `Configurazione_Richiesta`) are always added automatically.
+
+---
+
+## End-to-end cURL walkthrough
+
+```bash
+# 1) Create a version
+curl -s -X POST http://localhost:8000/api/v1/versions \
+  -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"name":"Campaign 2026"}'
+# → {"id":2,"name":"Campaign 2026",...}
+
+# 2) Ingest players
+curl -s -X POST http://localhost:8000/api/v1/versions/2/players \
+  -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"items":[
+        {"email":"alice@example.test","registered_at":"2026-01-10 09:00:00"},
+        {"email":"bob@example.test","registered_at":"2026-01-20 09:00:00"}
+      ]}'
+# → {"count":2,"items":[{"id":...,"email":"alice@example.test",...}, ...]}
+
+# 3) Ingest events (player_id from step 2)
+curl -s -X POST http://localhost:8000/api/v1/versions/2/events \
+  -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"items":[
+        {"player_id":1,"type":"open","occurred_at":"2026-01-11 10:00:00","payload":{"language":"it","score":120}}
+      ]}'
+
+# 3b) Streaming ingest (NDJSON — one event per line)
+printf '%s\n' \
+  '{"player_id":1,"type":"complete","occurred_at":"2026-01-12 10:00:00","payload":{"language":"it"}}' \
+  '{"player_id":1,"type":"share","occurred_at":"2026-01-13 10:00:00","payload":{"language":"en"}}' \
+  | curl -s -X POST http://localhost:8000/api/v1/versions/2/events/stream \
+      -H "Content-Type: application/x-ndjson" --data-binary @-
+
+# 4) Request an export
+curl -s -X POST http://localhost:8000/api/v1/versions/2/exports \
+  -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{
+        "format":"xlsx",
+        "date_from":"2026-01-01","date_to":"2026-12-31",
+        "sheets":[
+          {"name":"players","columns":["player_id","email","registered_at"],"sort":["registered_at:desc"]},
+          {"name":"events","columns":["type","payload.language"],"filters":{"payload.language":"it"}},
+          {"name":"events_summary","group_by":["type","payload.language"],"metrics":["count","unique_players"]}
+        ]
+      }'
+# → {"id":15,"status":"pending",...}
+
+# 5) Poll status until "completed"
+curl -s http://localhost:8000/api/v1/exports/15 -H "Accept: application/json"
+# → {"id":15,"status":"completed","download_url":"http://localhost:8000/api/v1/exports/15/download",...}
+
+# 6) Download the file
+curl -s -L -OJ http://localhost:8000/api/v1/exports/15/download
+```
+
+### Validation example (immediate `422`)
+
+```bash
+curl -s -X POST http://localhost:8000/api/v1/versions/2/exports \
+  -H "Content-Type: application/json" -H "Accept: application/json" \
+  -d '{"sheets":[{"name":"players","columns":["player_id","does_not_exist"]}]}'
+# → 422, errors on sheets.0
+```
+
+---
+
+## Example output
+
+Generate an example file by following the [cURL walkthrough](#end-to-end-curl-walkthrough)
+above (steps 4–6). A typical export contains the auto-injected `README` and
+`Configurazione_Richiesta` metadata sheets, followed by the requested data sheets
+(e.g. `Players`, `Events`, `Events_Summary`).
+
+---
+
+## Notes & known limitations
+
+- **Format:** only `xlsx` is currently supported.
+- **Streaming at scale:** rows are streamed with `cursor()`. For the spec's extreme volumes
+  (10M events / 500k rows) you'd additionally disable MySQL buffered queries on the export
+  connection; `cursor()` is sufficient for the provided dataset.
+- **`payload.*` queries** use MySQL `JSON_EXTRACT` (bound paths) — MySQL-specific, as required by the stack.
+- The NDJSON streaming endpoint reads `php://input` directly (true streaming), which the
+  HTTP test client does not populate; it is therefore covered manually rather than in the suite.
