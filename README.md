@@ -51,13 +51,22 @@ POST /versions/{v}/exports ──► ExportController ──► GenerateExportJo
 # 1. Environment
 cp .env.example .env
 
-# 2. Build & start the stack (app, worker, mysql, redis)
-docker compose up -d --build
+# 2. Build the images
+docker compose build
 
-# 3. App key
+# 3. Install PHP dependencies.
+#    Run in a one-off container BEFORE starting the stack: the app/worker CMD
+#    needs vendor/ to boot, and vendor/ is not committed. (--no-deps avoids
+#    spinning up mysql/redis just for this.)
+docker compose run --rm --no-deps app composer install
+
+# 4. Start the stack (app, worker, mysql, redis)
+docker compose up -d
+
+# 5. App key
 docker compose exec app php artisan key:generate
 
-# 4. Migrate and seed demo data (one version with players/events/…)
+# 6. Migrate and seed demo data (one version with players/events/…)
 docker compose exec app php artisan migrate --seed
 ```
 
